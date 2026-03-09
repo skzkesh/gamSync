@@ -1,0 +1,37 @@
+import { useAppStore } from '@/stores/appStore';
+
+const TASK_CMS_BASE_URL = import.meta.env.VITE_TASK_CMS_BASE_URL || 'http://100.75.157.95/api/taskscms';
+
+/**
+ * Ensures the current user exists in coursecredits.Users (for taskscms APIs).
+ * If user_information.php returns 404, POSTs appStore.user to sync_user.php.
+ */
+export async function ensureUserSynced(): Promise<void> {
+    const appStore = useAppStore();
+    if (!appStore.user?.id) return;
+
+    const userId = String(appStore.user.id);
+    console.log('[ensureUserSynced] called, user_id:', userId);
+    const checkRes = await fetch(`${TASK_CMS_BASE_URL}/user_information.php?user_id=${userId}`);
+    console.log('[ensureUserSynced] user_information.php status:', checkRes.status);
+
+    if (checkRes.status !== 404) return;
+
+    const body = JSON.stringify(appStore.user);
+    const syncRes = await fetch(`${TASK_CMS_BASE_URL}/sync_user.php`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body,
+    });
+    if (!syncRes.ok) {
+        const text = await syncRes.text();
+        let detail = text;
+        try {
+            const j = JSON.parse(text);
+            detail = j.detail ?? j.error ?? text;
+        } catch {
+            /**/
+        }
+        console.error('[ensureUserSynced] sync_user.php failed:', syncRes.status, detail || '(empty)');
+    }
+}
