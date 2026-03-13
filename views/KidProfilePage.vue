@@ -103,10 +103,9 @@ import ProfilePictureEditor from '@/components/ui/ProfilePictureEditor.vue';
 import { getKidsApi } from '@/api/member';
 import {
     getUserByEmailUrl,
-    getMembershipTiersUrl,
-    getMembershipTierByPointsUrl
 } from '@/utils/apiConfig';
 import { useAppStore } from '@/stores/appStore';
+import { ensureUserSynced } from '@/composables/useTaskscmsSync';
 import editIcon from '@/assets/icons/edit.png';
 import defaultAvatar from '@/assets/icons/meerkat 1.png';
 
@@ -122,11 +121,6 @@ const isChinese = computed(() => locale.value === 'zh-HK');
 
 const isUserStored = ref(false);
 const userData = ref<any>(null);
-
-const points = ref(0);
-const allTiers = ref<MembershipTier[]>([]);
-const currentTier = ref<MembershipTier | null>(null);
-
 
 async function fetchUserByEmail() {
   try {
@@ -155,8 +149,10 @@ async function fetchUserByEmail() {
     const data = await resp.json();
     console.log('API response:', data);
 
-    const userData = data.user || data.data || data;
-    
+    const userData = data;
+    console.log('App store:', appStore.user);
+    console.log('Data:', data);
+
     if (!userData || (Array.isArray(userData) && userData.length === 0)) {
       console.log('User data is empty');
       isUserStored.value = false;
@@ -175,10 +171,10 @@ async function fetchUserByEmail() {
     
     return { exists: true, user: userData };
 
-  } catch (error) {
-    console.error('Error fetching user:', error);
+  } catch (err) {
+    console.error('Error fetching user:', err);
     isUserStored.value = false;
-    return { exists: false, user: null, error: error.message };
+    return { exists: false, user: null, error: err instanceof Error ? err.message : String(err) };
   }
 }
 
@@ -188,14 +184,13 @@ onIonViewWillEnter(async () => {
         kid.value = resp.data.data;
     }
 
+    // Check if user email exists in our database; if not, do nothing (no auto-sync).
     const userResult = await fetchUserByEmail();
-    
     if (userResult.exists && userResult.user) {
-        points.value = userResult.user.total_points;
-        console.log('User points:', points.value);
+        userData.value = userResult.user;
     } else {
-        console.log('User not found, setting points to 0');
-        points.value = 0;
+        // User not in DB: do nothing
+        userData.value = null;
     }
 });
 
@@ -215,7 +210,9 @@ const navigateToPersonality = () => {
     router.push('/personality');
 };
 
-const navigateToVouchers = () => {
+const navigateToVouchers = async () => {
+    // Sync user to our database (tasks CMS), then go to Vouchers. When page is reloaded/re-entered, user will be defined.
+    await ensureUserSynced();
     router.push('/vouchers');
 };
 </script>
