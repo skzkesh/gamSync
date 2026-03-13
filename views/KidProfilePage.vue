@@ -69,7 +69,7 @@ We can confirm that the user is added to our database from the users API.
                     <div class="sync-user-section">
                         <button
                             type="button"
-                            @click="navigateToVouchers"
+                            @click="doSync"
                         >
                             Click this text to sync user
                         </button>
@@ -210,10 +210,10 @@ const navigateToPersonality = () => {
     router.push('/personality');
 };
 
-const navigateToVouchers = async () => {
+const doSync = async () => {
     // Sync user to our database (tasks CMS), then go to Vouchers. When page is reloaded/re-entered, user will be defined.
     await ensureUserSynced();
-    router.push('/vouchers');
+    console.log('Sync finished');
 };
 </script>
 
